@@ -2,9 +2,14 @@
 /*
 Plugin Name: Multisite Active Plugins
 Description: A simple plugin for WordPress multisites that lists all installed plugins, shows a summary of activation counts with anchor links, and details which sites have each plugin active. Visible only in network admin for super admins.
-Version: 1.0.0
+Version: 1.0.1
 Author: Joel Lisenby
 */
+
+// Prevent direct access to the file
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 // Ensure this only runs in multisite
 if (!is_multisite()) {
@@ -18,7 +23,7 @@ function ms_plugin_lister_add_menu() {
     add_menu_page(
         'Multisite Plugin List',
         'Active Plugins',
-        'manage_network',
+        'manage_network_plugins',
         'ms-plugin-list',
         'ms_plugin_lister_display_page',
         'dashicons-plugins-checked',
@@ -28,7 +33,7 @@ function ms_plugin_lister_add_menu() {
 
 // Display the page content
 function ms_plugin_lister_display_page() {
-    if (!is_super_admin() || !is_network_admin()) {
+    if (!current_user_can('manage_network_plugins') || !is_network_admin()) {
         wp_die('Access denied.');
     }
 
@@ -45,8 +50,9 @@ function ms_plugin_lister_display_page() {
     // Get all sites
     $sites = get_sites(array('number' => false, 'orderby' => 'id'));
 
-    // Collect active plugins per site
+    // Collect active plugins per site and site names
     $site_active_plugins = array();
+    $site_names = array();
     foreach ($sites as $site) {
         switch_to_blog($site->blog_id);
         $site_active_plugins[$site->blog_id] = get_option('active_plugins', array());
@@ -91,7 +97,7 @@ function ms_plugin_lister_display_page() {
     // Display summary
     echo '<h2>Summary</h2>';
     echo '<ul>';
-    echo '<li style="border-bottom: 1px solid #c7c7c7;"><span style="display: grid; grid-template-columns: 3fr 1fr; max-width: 600px;padding: 0.5em 0;"><span class="name">Plugin Name</span><span class="count" style="text-align: right;">Active Sites</span></a></li>';
+    echo '<li style="border-bottom: 1px solid #c7c7c7;"><span style="display: grid; grid-template-columns: 3fr 1fr; max-width: 600px;padding: 0.5em 0;"><span class="name">Plugin Name</span><span class="count" style="text-align: right;">Active Sites</span></span></li>';
     foreach ($plugin_data as $basename => $data) {
         echo '<li style="border-bottom: 1px solid #c7c7c7;"><a style="display: grid; grid-template-columns: 3fr 1fr; max-width: 600px;padding: 0.5em 0;" href="#' . esc_attr($data['slug']) . '"><span class="name">' . esc_html($data['name']) . '</span><span class="count" style="text-align: right;">' . $data['count'] . '</span></a></li>';
     }
@@ -106,7 +112,7 @@ function ms_plugin_lister_display_page() {
             echo '<ul>';
             foreach ($data['sites'] as $site_id) {
                 $site_name = isset($site_names[$site_id]) ? $site_names[$site_id] : 'Site ID ' . $site_id;
-                $site_url = get_home_url($site_id);
+                $site_url = get_admin_url($site_id);
                 echo '<li><a href="' . esc_url($site_url) . '" target="_blank">' . esc_html($site_name) . ' (ID: ' . $site_id . ')</a></li>';
             }
             echo '</ul>';
